@@ -1,6 +1,8 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
 
+const textureLoader = new THREE.TextureLoader();
+
 function main() {
   // 创建场景
   const scene = new THREE.Scene();
@@ -139,14 +141,34 @@ function main() {
   }
 
   // 创建窗户
-  function createWindow() {
+  function createWindow(width = 1.5, height = 1.2) {
     const window = new THREE.Group();
 
+    // 加载窗户纹理
+    const windowTexture = textureLoader.load('https://www.shutterstock.com/image-photo/young-woman-stands-on-wooden-600w-585464885.jpg');
+    windowTexture.wrapS = THREE.RepeatWrapping;
+    windowTexture.wrapT = THREE.RepeatWrapping;
+    windowTexture.repeat.set(1, 1);
+
+    const windowMaterial = new THREE.MeshStandardMaterial({
+      map: windowTexture,
+      transparent: true,
+      opacity: 0.8,
+      metalness: 0.3,
+      roughness: 0.2
+    });
+
     const windowFrame = new THREE.Mesh(
-      new THREE.BoxGeometry(1.5, 1.2, 0.1),
-      new THREE.MeshStandardMaterial({ color: 0xffffff })
+      new THREE.BoxGeometry(width, height, 0.1),
+      windowMaterial
     );
     window.add(windowFrame);
+
+    // 添加调整尺寸的方法
+    window.resize = function(newWidth, newHeight) {
+      windowFrame.geometry.dispose();
+      windowFrame.geometry = new THREE.BoxGeometry(newWidth, newHeight, 0.1);
+    };
 
     return window;
   }
@@ -155,17 +177,29 @@ function main() {
   function createSofa() {
     const sofa = new THREE.Group();
 
+    // 加载沙发纹理
+    const sofaTexture = textureLoader.load('https://www.shutterstock.com/image-photo/young-woman-stands-on-wooden-600w-585464885.jpg');
+    sofaTexture.wrapS = THREE.RepeatWrapping;
+    sofaTexture.wrapT = THREE.RepeatWrapping;
+    sofaTexture.repeat.set(2, 2);
+
+    const sofaMaterial = new THREE.MeshStandardMaterial({
+      map: sofaTexture,
+      roughness: 0.8,
+      metalness: 0.2
+    });
+
     // 沙发座位
     const seat = new THREE.Mesh(
       new THREE.BoxGeometry(1.5, 0.5, 0.8),
-      new THREE.MeshStandardMaterial({ color: 0x404040 })
+      sofaMaterial
     );
     sofa.add(seat);
 
     // 沙发靠背
     const backrest = new THREE.Mesh(
       new THREE.BoxGeometry(1.5, 0.8, 0.2),
-      new THREE.MeshStandardMaterial({ color: 0x404040 })
+      sofaMaterial
     );
     backrest.position.z = -0.3;
     backrest.position.y = 0.4;
@@ -205,9 +239,14 @@ function main() {
   door.position.set(-2, 1.1, -4.9);
   scene.add(door);
 
-  const windowMesh = createWindow();
+  const windowMesh = createWindow(2, 1.5);
   windowMesh.position.set(4, 1.8, -4.9);
   scene.add(windowMesh);
+
+  // 示例：3秒后改变窗户大小
+  setTimeout(() => {
+    windowMesh.resize(1.5, 1.2);
+  }, 3000);
 
   const sofa = createSofa();
   sofa.position.set(4, 0.25, 2);
