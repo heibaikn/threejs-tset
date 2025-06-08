@@ -30,15 +30,102 @@ function main() {
   // controls.enableDamping = true;
   // controls.dampingFactor = 0.25;
 
+  // 修改拖拽相关变量，支持多个可移动物体
+  let isDragging = false;
+  let selectedObject = null;
+  const mouse = new THREE.Vector2();
+  const raycaster = new THREE.Raycaster();
+  const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+  const intersectionPoint = new THREE.Vector3();
+  const offset = new THREE.Vector3();
+  let targetPosition = new THREE.Vector3();
+  
+  // 可移动物体列表
+  const draggableObjects = new Set();
+
+  function makeObjectDraggable(object) {
+    draggableObjects.add(object);
+    object.traverse((child) => {
+      if (child instanceof THREE.Mesh) {
+        child.cursor = 'pointer';
+      }
+    });
+  }
+
+  // 添加鼠标事件监听器
+  renderer.domElement.addEventListener('mousedown', onMouseDown);
+  renderer.domElement.addEventListener('mousemove', onMouseMove);
+  renderer.domElement.addEventListener('mouseup', onMouseUp);
+
+  function onMouseDown(event) {
+    mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+    mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+    raycaster.setFromCamera(mouse, camera);
+    const intersects = raycaster.intersectObjects(scene.children, true);
+
+    if (intersects.length > 0) {
+      const object = intersects[0].object;
+      // 检查是否点击的是可拖动物体的一部分
+      let parent = object;
+      while (parent.parent && !(parent instanceof THREE.Scene)) {
+        if (draggableObjects.has(parent)) {
+          controls.enabled = false;
+          isDragging = true;
+          selectedObject = parent;
+
+          raycaster.ray.intersectPlane(plane, intersectionPoint);
+          offset.copy(selectedObject.position).sub(intersectionPoint);
+          break;
+        }
+        parent = parent.parent;
+      }
+    }
+  }
+
+  function onMouseMove(event) {
+    if (isDragging && selectedObject) {
+      mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+      mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+      raycaster.setFromCamera(mouse, camera);
+      raycaster.ray.intersectPlane(plane, intersectionPoint);
+      
+      targetPosition.copy(intersectionPoint).add(offset);
+      // 限制沙发在房间范围内移动
+      targetPosition.x = Math.max(-4, Math.min(4, targetPosition.x));
+      targetPosition.z = Math.max(-4, Math.min(4, targetPosition.z));
+      
+      selectedObject.position.copy(targetPosition);
+    }
+  }
+
+  function onMouseUp() {
+    isDragging = false;
+    selectedObject = null;
+    controls.enabled = true;
+  }
+
   // 创建房间
   function createRoom() {
     const room = new THREE.Group();
 
     // 地板
-    const floorGeometry = new THREE.PlaneGeometry(10, 10);
+    const gridSize = 100; // 网格大小
+    const gridDivisions = 100; // 网格分割数
+    
+    // 创建网格辅助对象
+    const grid = new THREE.GridHelper(gridSize, gridDivisions, 0x888888, 0x888888);
+    grid.position.y = 0.01; // 稍微抬高一点，避免z-fighting
+    room.add(grid);
+
+    // 圆形地板
+    const floorGeometry = new THREE.CircleGeometry(50, 64); // 半径50，64个分段
     const floorMaterial = new THREE.MeshStandardMaterial({
       color: 0x808080,
-      roughness: 0.8
+      roughness: 0.8,
+      transparent: true,
+      opacity: 0.9
     });
     const floor = new THREE.Mesh(floorGeometry, floorMaterial);
     floor.rotation.x = -Math.PI * 0.5;
@@ -234,6 +321,7 @@ function main() {
   const table = createPingPongTable();
   table.position.set(0, 0, 0);
   scene.add(table);
+  makeObjectDraggable(table);  // 使乒乓球桌可拖动
 
   const door = createDoor();
   door.position.set(-2, 1.1, -4.9);
@@ -252,6 +340,7 @@ function main() {
   sofa.position.set(4, 0.25, 2);
   sofa.rotation.y = Math.PI * 0.5;
   scene.add(sofa);
+  makeObjectDraggable(sofa);  // 使沙发可拖动
 
   // const bed = createBed();
   // bed.position.set(4, 0.25, 2);
